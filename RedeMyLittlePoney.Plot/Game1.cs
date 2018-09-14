@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 
 //Aliases
-using Realizacao = RedeAmarildo.Algoritmo.Realizacao;
+using Realizacao = RedeMyLittlePoney.Algoritmo.Realizacao;
 using FMatrix = MathNet.Numerics.LinearAlgebra.Matrix<double>;
 
 namespace RedeMyLittlePoney.Plot
