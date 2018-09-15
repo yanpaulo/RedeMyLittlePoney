@@ -208,7 +208,7 @@ module Algoritmo =
             realizacao (dados.SelectPermutation() |> List.ofSeq) parametros.NumeroNeuronios parametros.TaxaAprendizado
 
         let realizacoes =
-            [0 .. 5] |> PSeq.map map |> PSeq.toList
+            [0 .. 20] |> PSeq.map map |> PSeq.toList
     
         let maior = 
             realizacoes |>
