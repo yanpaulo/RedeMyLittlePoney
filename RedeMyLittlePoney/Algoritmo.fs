@@ -173,7 +173,7 @@ module Algoritmo =
     
     let sw = new Stopwatch();
 
-    let algoritmoIris =
+    let algoritmoIris () =
         printfn "Iris"
         let db = CsvFile.Load("iris.data").Cache()
         let classes = dict["Iris-setosa", [1.0; 0.0; 0.0]; "Iris-versicolor", [0.0; 1.0; 0.0]; "Iris-virginica", [0.0; 0.0; 1.0]]
@@ -203,18 +203,20 @@ module Algoritmo =
         printfn "\nParametros escolhidos: %A (%A)\n" parametros sw.Elapsed
         sw.Restart()
         printf "Fazendo realizacoes... "
+        
+        let map _ = 
+            realizacao (dados.SelectPermutation() |> List.ofSeq) parametros.NumeroNeuronios parametros.TaxaAprendizado
+
         let realizacoes =
-            [1..5] |>
-            Seq.map (fun _ -> (realizacao (dados.SelectPermutation() |> List.ofSeq)) parametros.NumeroNeuronios parametros.TaxaAprendizado) |>
-            List.ofSeq
+            [0 .. 5] |> PSeq.map map |> PSeq.toList
     
         let maior = 
             realizacoes |>
-            Seq.maxBy (fun r -> r.TaxaAcerto)
+            List.maxBy (fun r -> r.TaxaAcerto)
         
         let media =
             realizacoes |>
-            Seq.averageBy (fun r -> r.TaxaAcerto)
+            List.averageBy (fun r -> r.TaxaAcerto)
         
         sw.Stop()
         printfn "%A\n" sw.Elapsed
