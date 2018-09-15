@@ -12,7 +12,7 @@ module Algoritmo =
     type Par = { X: float Vector; Y: float Vector }
     type Modelo = { I: float Vector list; J: float Vector list }
     type Realizacao = { TaxaAcerto:float; Confusao: float Matrix; W: Modelo }
-    type ResultadoAlgoritmo = { Acuracia: float; Tempo: TimeSpan; Melhor: Realizacao; Dados: Par seq; }
+    type ResultadoAlgoritmo = { Acuracia: float; Melhor: Realizacao; Dados: Par seq; }
     
     //Funções
     let sigmoide x = 
@@ -51,7 +51,6 @@ module Algoritmo =
         
         //Próximo modelo (função w(n+1))
         let rec proximo t m = 
-            (m: Modelo) |> ignore
             match t with
                 | [] -> m
                 | par :: tail -> 
@@ -62,7 +61,6 @@ module Algoritmo =
                     let wjMap j wj = 
                         let e = erro.[j]
                         let f'u = sigmoide' (ponderada wj xj)
-                        //let h = saida m.I.[j] par.X
                         let h = xj
 
                         let ajuste = e * taxa * f'u * h
@@ -76,7 +74,7 @@ module Algoritmo =
                             let f'u j = ponderada (wj j) xj |> sigmoide'
                             let wji j = (wj j).[i]
 
-                            let map j wj = e j * f'u j * wji j
+                            let map j _ = e j * f'u j * wji j
                             m.J |> List.mapi map |> List.sum
 
                         let ajuste = taxa * h'u * somatorio * par.X
@@ -98,13 +96,13 @@ module Algoritmo =
         let numNeuronios = 5
         let numClasses = 3
 
-        let rv n = 
+        let vetorAleatorioFn n = 
             let f _ = Random.doubles n |> vector
             f
         
-        let li = rv treinamento.Head.X.Count |> List.init numNeuronios 
+        let li = vetorAleatorioFn treinamento.Head.X.Count |> List.init numNeuronios 
 
-        let lj = rv (numNeuronios + 1) |> List.init numClasses 
+        let lj = vetorAleatorioFn (numNeuronios + 1) |> List.init numClasses 
         
         let m0 = { I = li; J = lj }
 
@@ -169,5 +167,5 @@ module Algoritmo =
         
         //printfn "%A %A" media maior
 
-        { Acuracia = media; Tempo = TimeSpan.Zero; Melhor = maior; Dados = dados; }
+        { Acuracia = media; Melhor = maior; Dados = dados; }
 
