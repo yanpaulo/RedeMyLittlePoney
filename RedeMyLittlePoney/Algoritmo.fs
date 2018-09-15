@@ -5,21 +5,26 @@ open FSharp.Data
 open MathNet.Numerics
 open MathNet.Numerics.Random
 open MathNet.Numerics.LinearAlgebra
-open System.Diagnostics
+open FSharp.Collections.ParallelSeq
 
 module Algoritmo =
+    open System.Diagnostics
+
     //Tipos
     type Par = { X: float Vector; Y: float Vector }
     type Modelo = { I: float Vector list; J: float Vector list }
     type Realizacao = { TaxaAcerto:float; Confusao: float Matrix; W: Modelo }
-    type ResultadoAlgoritmo = { Acuracia: float; Melhor: Realizacao; Dados: Par seq; }
+
+    type ResultadoAlgoritmo = { Acuracia: float; Melhor: Realizacao; }
+    type ResultadoParametros = { NumeroNeuronios: int; TaxaAprendizado: float; Precisao: float }
     
     //Funções
     let sigmoide x = 
         1.0 /  (1.0 + Math.Pow(Math.E, -x))
     
     let sigmoide' x = 
-        Differentiate.derivative 1 x sigmoide
+        //Differentiate.derivative 1 x sigmoide
+        (sigmoide x) * (1.0 - (sigmoide x))
     
     let ponderada w x =
         x .* w |> Vector.sum
@@ -42,12 +47,11 @@ module Algoritmo =
         y |> Seq.map (fun n -> Math.Round n) |> vector
 
     //Próximo modelo para o vetor "treinamento"
-    let pesos treinamento =
+    let pesos treinamento neuronios taxa =
         (treinamento: Par list) |> ignore
 
-        //Máximo de épocas
-        let maxN = 500
-        let taxa = 0.15
+        //Épocas
+        let maxN = 200
         
         //Próximo modelo (função w(n+1))
         let rec proximo t m = 
@@ -93,23 +97,22 @@ module Algoritmo =
 
             if n < maxN then pesos w1 (n+1) else w1
         
-        let numNeuronios = 5
         let numClasses = 3
 
         let vetorAleatorioFn n = 
             let f _ = Random.doubles n |> vector
             f
         
-        let li = vetorAleatorioFn treinamento.Head.X.Count |> List.init numNeuronios 
+        let li = vetorAleatorioFn treinamento.Head.X.Count |> List.init neuronios 
 
-        let lj = vetorAleatorioFn (numNeuronios + 1) |> List.init numClasses 
+        let lj = vetorAleatorioFn (neuronios + 1) |> List.init numClasses 
         
         let m0 = { I = li; J = lj }
 
         //Inicia o treinamento
         pesos m0 0
 
-    let realizacao dados =
+    let realizacao dados neuronios taxa =
         let confusao = DenseMatrix.zero 3 3
     
         let treinamento = 
@@ -118,7 +121,7 @@ module Algoritmo =
 
         let teste = dados |> List.except treinamento
 
-        let w = pesos treinamento
+        let w = pesos treinamento neuronios taxa
 
         let classes = dict[[1.0; 0.0; 0.0] |> vector, 0; [0.0; 1.0; 0.0] |> vector, 1; [0.0; 0.0; 1.0] |> vector, 2]
 
@@ -129,8 +132,49 @@ module Algoritmo =
                 )
         
         { TaxaAcerto = confusao.Diagonal().Sum() / float (teste |> Seq.length) ; Confusao = confusao; W = w }
+    
+    let precisao dados neuronios taxa = 
+        (dados: Par list) |> ignore
+        let secoes = 5
+        let tamanhoSecao = dados.Length / secoes
+
+        let precisaoSecao n =
+            let head = dados |> List.take (tamanhoSecao * n)
+            let secao = dados |> List.skip (tamanhoSecao * n) |> List.take tamanhoSecao
+            let tail = dados |> List.skip (tamanhoSecao * (n + 1))
+
+            let treinamento = head @ tail
+            let teste = secao
+
+            let m = pesos treinamento neuronios taxa
+            let acertos = 
+                teste |> 
+                List.map (fun t -> resultado m t.X = t.Y) |>
+                List.filter (fun r -> r) |>
+                List.length |> float
+            
+            acertos / (float teste.Length)
+
+        [0 .. (secoes - 1)] |> List.map precisaoSecao |> List.average
+
+    let ajusteGrid dados = 
+        let taxas = [0.1 .. 0.1 .. 0.5]
+        let neuronios = [4 .. 10]
+        let combinacoes = List.allPairs neuronios taxas 
+        
+        let map (neuronios, taxa) =
+            let precisao = precisao dados neuronios taxa
+            let mapping = { NumeroNeuronios = neuronios; TaxaAprendizado = taxa; Precisao = precisao }
+            printfn "%A" mapping
+            mapping
+            
+            
+        combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
+    
+    let sw = new Stopwatch();
 
     let algoritmoIris =
+        printfn "Iris"
         let db = CsvFile.Load("iris.data").Cache()
         let classes = dict["Iris-setosa", [1.0; 0.0; 0.0]; "Iris-versicolor", [0.0; 1.0; 0.0]; "Iris-virginica", [0.0; 0.0; 1.0]]
 
@@ -152,9 +196,16 @@ module Algoritmo =
     
         let dados = db.Rows |> Seq.map mapRow |> List.ofSeq
 
+        printfn "Busca de parâmetros em grade\n"
+        sw.Start()
+        let parametros = ajusteGrid dados
+        sw.Stop()
+        printfn "\nParametros escolhidos: %A (%A)\n" parametros sw.Elapsed
+        sw.Restart()
+        printf "Fazendo realizacoes... "
         let realizacoes =
             [1..5] |>
-            Seq.map (fun _ -> realizacao (dados.SelectPermutation() |> List.ofSeq)) |>
+            Seq.map (fun _ -> (realizacao (dados.SelectPermutation() |> List.ofSeq)) parametros.NumeroNeuronios parametros.TaxaAprendizado) |>
             List.ofSeq
     
         let maior = 
@@ -165,7 +216,8 @@ module Algoritmo =
             realizacoes |>
             Seq.averageBy (fun r -> r.TaxaAcerto)
         
-        //printfn "%A %A" media maior
+        sw.Stop()
+        printfn "%A\n" sw.Elapsed
 
-        { Acuracia = media; Melhor = maior; Dados = dados; }
+        { Acuracia = media; Melhor = maior; }
 
