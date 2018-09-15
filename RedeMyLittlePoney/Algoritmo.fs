@@ -18,8 +18,8 @@ module Algoritmo =
     let sigmoide x = 
         1.0 /  (1.0 + Math.Pow(Math.E, -x))
     
-    let sigmoide' x =
-        sigmoide x
+    let sigmoide' x = 
+        Differentiate.derivative 1 x sigmoide
     
     let ponderada w x =
         x .* w |> Vector.sum
@@ -27,14 +27,19 @@ module Algoritmo =
     let saida w x =
         ponderada w x |> sigmoide
 
-    let saidaCamada c x =
-        let map n = saida n x
-        c |> List.map map |> vector
-
+    let saidaCamadaI c x =
+        let map w = saida w x
+        let saida = c |> List.map map
+        -1.0 :: saida |> vector
+        
+    let saidaCamadaJ c x =
+        let map w = saida w x
+        c |> Seq.map map |> vector
+    
     let resultado m x =
-        let xj = saidaCamada m.I x
-        let map j = saida x xj
-        m.J |> Seq.map map |> vector
+        let xj = saidaCamadaI m.I x
+        let y = saidaCamadaJ m.J xj
+        y |> Seq.map (fun n -> Math.Round n) |> vector
 
     //Próximo modelo para o vetor "treinamento"
     let pesos treinamento =
@@ -42,6 +47,7 @@ module Algoritmo =
 
         //Máximo de épocas
         let maxN = 500
+        let taxa = 0.15
         
         //Próximo modelo (função w(n+1))
         let rec proximo t m = 
@@ -49,20 +55,20 @@ module Algoritmo =
             match t with
                 | [] -> m
                 | par :: tail -> 
-                    let xj = saidaCamada m.I par.X
-                    let y = saidaCamada m.J xj
+                    let xj = saidaCamadaI m.I par.X
+                    let y = saidaCamadaJ m.J xj
                     let erro = par.Y - y
 
-                    let wjMap i wj = 
-                        let e = erro.[i]
+                    let wjMap j wj = 
+                        let e = erro.[j]
                         let f'u = sigmoide' (ponderada wj xj)
-                        let h = saida m.I.[i] par.X
+                        //let h = saida m.I.[j] par.X
+                        let h = xj
 
-                        let ajuste = -e * f'u * h
+                        let ajuste = e * taxa * f'u * h
                         wj + ajuste
 
                     let wiMap i wi =
-                        let n = 0.1
                         let h'u = ponderada wi par.X |> sigmoide'
                         let somatorio =
                             let wj j = m.J.[j]
@@ -73,7 +79,8 @@ module Algoritmo =
                             let map j wj = e j * f'u j * wji j
                             m.J |> List.mapi map |> List.sum
 
-                        n * h'u * somatorio * par.X
+                        let ajuste = taxa * h'u * somatorio * par.X
+                        wi + ajuste
 
                     let j1 = m.J |> List.mapi wjMap
                     let i1 = m.I |> List.mapi wiMap
@@ -97,7 +104,7 @@ module Algoritmo =
         
         let li = rv treinamento.Head.X.Count |> List.init numNeuronios 
 
-        let lj = rv numNeuronios |> List.init numClasses 
+        let lj = rv (numNeuronios + 1) |> List.init numClasses 
         
         let m0 = { I = li; J = lj }
 
@@ -143,12 +150,12 @@ module Algoritmo =
 
         let parseRow (row: CsvRow) = row.Columns |> Seq.take 4 |> Seq.map normaliza |> List.ofSeq
 
-        let mapRow (row: CsvRow) = { X = 1.0 :: parseRow row |> vector; Y = classes.[row.["class"]] |> vector }
+        let mapRow (row: CsvRow) = { X = parseRow row |> vector; Y = classes.[row.["class"]] |> vector }
     
         let dados = db.Rows |> Seq.map mapRow |> List.ofSeq
 
         let realizacoes =
-            [1..20] |>
+            [1..5] |>
             Seq.map (fun _ -> realizacao (dados.SelectPermutation() |> List.ofSeq)) |>
             List.ofSeq
     
