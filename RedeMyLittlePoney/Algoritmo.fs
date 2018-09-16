@@ -291,10 +291,11 @@ module Algoritmo =
         let neuronios = [7 .. 10]
 
         algoritmoCSV db classes 10 neuronios taxas
+    
+    let classesXor = [ vector [1.0; 0.0]; vector [0.0; 1.0]]
+    let classesXorSeq = classesXor |> seq
 
-    let algoritmoXor () =
-        printfn "XOR"
-        
+    let dadosXor = 
         let range min max n =
             let range = max - min
             n * range + min
@@ -318,16 +319,20 @@ module Algoritmo =
         let y4 = Random.doubles 50 |> Seq.map (range 0.5 1.0)
         let q4 = Seq.zip x4 y4 |> Seq.map mapV |> List.ofSeq
 
-        let classes = [ vector [1.0; 0.0]; vector [0.0; 1.0]]
-
         let mapClass index c =
-            {X = c; Y = classes.[index]}
+            {X = c; Y = classesXor.[index]}
 
         let classe1 = q1 @ q4 |> List.map (mapClass 0)
         let classe2 = q2 @ q3 |> List.map (mapClass 1)
         let dados = classe1 @ classe2
+        dados
+    
+    let dadosXorSeq = dadosXor |> seq
+
+    let algoritmoXor () =
+        printfn "XOR"
         
         let neuronios = [4 .. 10]
         let taxas = [0.1 .. 0.1 .. 0.5]
 
-        algoritmo dados classes neuronios taxas
+        algoritmo dadosXor classesXor neuronios taxas
