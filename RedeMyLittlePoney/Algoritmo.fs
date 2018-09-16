@@ -332,7 +332,7 @@ module Algoritmo =
     let algoritmoXor () =
         printfn "XOR"
         
-        let neuronios = [4 .. 10]
-        let taxas = [0.1 .. 0.1 .. 0.5]
+        let neuronios = [8 .. 10]
+        let taxas = [0.4 .. 0.1 .. 0.5]
 
         algoritmo dadosXor classesXor neuronios taxas

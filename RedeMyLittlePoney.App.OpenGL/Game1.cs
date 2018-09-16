@@ -18,7 +18,7 @@ namespace RedeMyLittlePoney.App.OpenGL
 
         internal List<PointColor> CoresFundo { get; private set; }
         internal IEnumerable<PointColor> PontosXOR { get; private set; }
-        private Texture2D white;
+        private Texture2D white, gray;
 
         public Game1()
         {
@@ -86,6 +86,9 @@ namespace RedeMyLittlePoney.App.OpenGL
 
             white = new Texture2D(GraphicsDevice, 1, 1);
             white.SetData(new [] { Color.White });
+
+            gray = new Texture2D(GraphicsDevice, 1, 1);
+            gray.SetData(new[] { Color.DarkGray });
             // TODO: use this.Content to load your game content here
         }
 
@@ -121,16 +124,21 @@ namespace RedeMyLittlePoney.App.OpenGL
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
             // TODO: Add your drawing code here
-            spriteBatch.Begin();
+            
+            var m = Matrix.CreateTranslation(new Vector3(100.0f, 100.0f, 0.0f)) * Matrix.CreateScale(2.0f);
+            spriteBatch.Begin(transformMatrix: m);
             foreach (var cor in CoresFundo)
             {
-                spriteBatch.Draw(white, cor.Point.ToVector2(), cor.Color);
+                spriteBatch.Draw(gray, cor.Point.ToVector2(), cor.Color);
             }
 
             foreach (var cor in PontosXOR)
             {
+                var rect = new Rectangle(cor.Point.X - 2, cor.Point.Y - 2, 4, 4);
                 spriteBatch.Draw(white, cor.Point.ToVector2(), cor.Color);
             }
+
+            spriteBatch.End();
 
             base.Draw(gameTime);
         }
