@@ -16,6 +16,7 @@ module Algoritmo =
     type Par = { X: float Vector; Y: float Vector }
     type Modelo = { I: float Vector list; J: float Vector list }
     type Realizacao = { TaxaAcerto:float; Confusao: float Matrix; W: Modelo }
+    type Entrada = { Dados: Par list; Classes: Vector<float> list; NumeroNeuronios: float; TaxaAprendizado: int }
 
     type ResultadoAlgoritmo = { Acuracia: float; Melhor: Realizacao; }
     type ResultadoParametros = { NumeroNeuronios: int; TaxaAprendizado: float; Precisao: float }
@@ -47,10 +48,15 @@ module Algoritmo =
         let xj = saidaCamadaI m.I x
         let y = saidaCamadaJ m.J xj
         y |> Seq.map (fun n -> Math.Round n) |> vector
+    
+    let normaliza x min max =
+        (x - min) / (max - min)
 
+    let sw = new Stopwatch();
+    
     //Próximo modelo para o vetor "treinamento"
-    let pesos treinamento neuronios taxa classes =
-        (treinamento: Par list) |> ignore
+    let pesos dados classes neuronios taxa  =
+        (dados: Par list) |> ignore
 
         //Épocas
         let maxN = 200
@@ -95,7 +101,7 @@ module Algoritmo =
     
         //Decide se os pesos ainda devem ser atualizados (por número de épocas)
         let rec pesos m n =
-            let w1 = proximo (treinamento.SelectPermutation() |> List.ofSeq) m
+            let w1 = proximo (dados.SelectPermutation() |> List.ofSeq) m
 
             if n < maxN then pesos w1 (n+1) else w1
         
@@ -103,7 +109,7 @@ module Algoritmo =
             let f _ = Random.doubles n |> vector
             f
         
-        let li = vetorAleatorioFn treinamento.Head.X.Count |> List.init neuronios 
+        let li = vetorAleatorioFn dados.Head.X.Count |> List.init neuronios 
 
         let lj = vetorAleatorioFn (neuronios + 1) |> List.init classes 
         
@@ -122,7 +128,7 @@ module Algoritmo =
 
         let teste = dados |> List.except treinamento
 
-        let w = pesos treinamento neuronios taxa numClasses
+        let w = pesos treinamento numClasses neuronios taxa 
         
         let iter par =
             let y = resultado w par.X
@@ -138,7 +144,7 @@ module Algoritmo =
         
         { TaxaAcerto = confusao.Diagonal().Sum() / float (teste |> Seq.length) ; Confusao = confusao; W = w }
     
-    let precisao dados neuronios taxa classes = 
+    let precisao dados classes neuronios taxa  = 
         (dados: Par list) |> ignore
         let secoes = 5
         let tamanhoSecao = dados.Length / secoes
@@ -151,7 +157,7 @@ module Algoritmo =
             let treinamento = head @ tail
             let teste = secao
 
-            let m = pesos treinamento neuronios taxa classes
+            let m = pesos treinamento classes neuronios taxa 
             let acertos = 
                 teste |> 
                 List.map (fun t -> resultado m t.X = t.Y) |>
@@ -166,18 +172,13 @@ module Algoritmo =
         let combinacoes = List.allPairs neuronios taxas 
         
         let map (neuronios, taxa) =
-            let precisao = precisao dados neuronios taxa classes
+            let precisao = precisao dados classes neuronios taxa 
             let mapping = { NumeroNeuronios = neuronios; TaxaAprendizado = taxa; Precisao = precisao }
             printfn "%A" mapping
             mapping
             
         combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
     
-    let sw = new Stopwatch();
-
-    let normaliza x min max =
-        (x - min) / (max - min)
-
     let algoritmo dados classes neuronios taxas = 
         let numClasses = classes |> List.length
 
@@ -209,10 +210,11 @@ module Algoritmo =
 
         { Acuracia = media; Melhor = maior; }
      
-    let algoritmoCSV db classes colunas colunaClasse neuronios taxas =
+    let algoritmoCSV db classes colunas neuronios taxas =
         (db : Runtime.CsvFile<CsvRow>) |> ignore
         (classes: Map<string, float Vector>) |> ignore
-        (colunaClasse : int) |> ignore
+
+        let colunaClasse = colunas
         let parse (s: string) = 
             match s with
                 | "?" -> 0.0
@@ -240,6 +242,7 @@ module Algoritmo =
         //let classes = classes.Values |> Seq.map (fun e -> vector e) |> List.ofSeq
         let classes = classes |> Map.toList |> List.map (fun (_, v) -> v)
 
+
         algoritmo dados classes neuronios taxas
 
     let algoritmoIris () =
@@ -249,7 +252,7 @@ module Algoritmo =
         let taxas = [0.1 .. 0.1 .. 0.5]
         let neuronios = [4 .. 10]
 
-        algoritmoCSV db classes 4 4 neuronios taxas
+        algoritmoCSV db classes 4 neuronios taxas
 
     let algoritmoColuna () =
         printfn "Coluna Terbreval"
@@ -258,7 +261,7 @@ module Algoritmo =
         let taxas = [0.2 .. 0.1 .. 0.5]
         let neuronios = [7 .. 10]
 
-        algoritmoCSV db classes 6 6 neuronios taxas
+        algoritmoCSV db classes 6 neuronios taxas
     
     let classesMap list = 
         let num = list |> List.length
@@ -277,15 +280,14 @@ module Algoritmo =
         let taxas = [0.1]
         let neuronios = [7 .. 10]
 
-        algoritmoCSV db classes 34 34 neuronios taxas
+        algoritmoCSV db classes 34 neuronios taxas
 
     let algoritmoCancer () =
         printfn "Câncer de Mama"
         let db = CsvFile.Load("breast-cancer-wisconsin.data").Cache()
         
-        let classes = [2; 4] |> classesMap
+        let classes = classesMap[2; 4]
         let taxas = [0.1]
         let neuronios = [7 .. 10]
 
-        algoritmoCSV db classes 10 10 neuronios taxas
-
+        algoritmoCSV db classes 10 neuronios taxas
