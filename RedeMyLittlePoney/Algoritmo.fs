@@ -162,9 +162,7 @@ module Algoritmo =
 
         [0 .. (secoes - 1)] |> List.map precisaoSecao |> List.average
 
-    let ajusteGrid dados classes = 
-        let taxas = [0.1 .. 0.1 .. 0.5]
-        let neuronios = [4 .. 10]
+    let ajusteGrid dados classes neuronios taxas = 
         let combinacoes = List.allPairs neuronios taxas 
         
         let map (neuronios, taxa) =
@@ -173,7 +171,6 @@ module Algoritmo =
             printfn "%A" mapping
             mapping
             
-            
         combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
     
     let sw = new Stopwatch();
@@ -181,12 +178,12 @@ module Algoritmo =
     let normaliza x min max =
         (x - min) / (max - min)
 
-    let algoritmo dados classes = 
+    let algoritmo dados classes neuronios taxas = 
         let numClasses = classes |> List.length
 
         printfn "Busca de parâmetros em grade\n"
         sw.Start()
-        let parametros = ajusteGrid dados numClasses
+        let parametros = ajusteGrid dados numClasses neuronios taxas
         sw.Stop()
         printfn "\nParametros escolhidos: \n%A \n(%A)\n" parametros sw.Elapsed
 
@@ -212,15 +209,15 @@ module Algoritmo =
 
         { Acuracia = media; Melhor = maior; }
      
-    let algoritmoCSV db classes columns classColumn =
+    let algoritmoCSV db classes colunas colunaClasse neuronios taxas =
         (db : Runtime.CsvFile<CsvRow>) |> ignore
         (classes: IDictionary<string, float Vector>) |> ignore
-        (classColumn : int) |> ignore
+        (colunaClasse : int) |> ignore
 
         let parse (s: string) = s.Replace(".", ",") |> System.Double.Parse
 
         let normaliza x =
-            let parseRow (row: CsvRow) = row.Columns|> Seq.take columns |> Seq.map parse
+            let parseRow (row: CsvRow) = row.Columns|> Seq.take colunas |> Seq.map parse
             let valores = db.Rows |> Seq.collect parseRow
             let min = valores |> Seq.min
             let max = valores |> Seq.max
@@ -229,26 +226,30 @@ module Algoritmo =
     
         let normaliza s = parse s |> normaliza
 
-        let parseRow (row: CsvRow) = row.Columns |> Seq.take columns |> Seq.map normaliza |> List.ofSeq
+        let parseRow (row: CsvRow) = row.Columns |> Seq.take colunas |> Seq.map normaliza |> List.ofSeq
 
-        let mapRow (row: CsvRow) = { X = parseRow row |> vector; Y = classes.[row.[classColumn]] |> vector }
+        let mapRow (row: CsvRow) = { X = parseRow row |> vector; Y = classes.[row.[colunaClasse]] |> vector }
     
         let dados = db.Rows |> Seq.map mapRow |> List.ofSeq
         let classes = classes.Values |> Seq.map (fun e -> vector e) |> List.ofSeq
 
-        algoritmo dados classes
+        algoritmo dados classes neuronios taxas
 
     let algoritmoIris () =
         printfn "Iris"
         let db = CsvFile.Load("iris.data").Cache()
         let classes = dict["Iris-setosa", vector [1.0; 0.0; 0.0]; "Iris-versicolor", vector [0.0; 1.0; 0.0]; "Iris-virginica", vector [0.0; 0.0; 1.0]]
-        
-        algoritmoCSV db classes 4 4
+        let taxas = [0.1 .. 0.1 .. 0.5]
+        let neuronios = [4 .. 10]
+
+        algoritmoCSV db classes 4 4 neuronios taxas
 
     let algoritmoColuna () =
         printfn "Coluna Terbreval"
         let db = CsvFile.Load("column_3C.dat", " ").Cache()
         let classes = dict["DH", vector [1.0; 0.0; 0.0]; "SL", vector [0.0; 1.0; 0.0]; "NO", vector [0.0; 0.0; 1.0]]
-        
-        algoritmoCSV db classes 6 6
+        let taxas = [0.2 .. 0.1 .. 0.5]
+        let neuronios = [7 .. 10]
+
+        algoritmoCSV db classes 6 6 neuronios taxas
 
