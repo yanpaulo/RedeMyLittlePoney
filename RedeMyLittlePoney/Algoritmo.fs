@@ -211,19 +211,25 @@ module Algoritmo =
      
     let algoritmoCSV db classes colunas colunaClasse neuronios taxas =
         (db : Runtime.CsvFile<CsvRow>) |> ignore
-        (classes: IDictionary<string, float Vector>) |> ignore
+        (classes: Map<string, float Vector>) |> ignore
         (colunaClasse : int) |> ignore
-
-        let parse (s: string) = s.Replace(".", ",") |> System.Double.Parse
-
-        let normaliza x =
+        let parse (s: string) = 
+            match s with
+                | "?" -> 0.0
+                | s -> s.Replace(".", ",") |> System.Double.Parse
+        
+        let minMax =
             let parseRow (row: CsvRow) = row.Columns|> Seq.take colunas |> Seq.map parse
             let valores = db.Rows |> Seq.collect parseRow
             let min = valores |> Seq.min
             let max = valores |> Seq.max
 
-            normaliza x min max
-    
+            (min, max)
+        
+        let (min, max) = minMax
+
+        let normaliza x = normaliza x min max
+
         let normaliza s = parse s |> normaliza
 
         let parseRow (row: CsvRow) = row.Columns |> Seq.take colunas |> Seq.map normaliza |> List.ofSeq
@@ -231,14 +237,15 @@ module Algoritmo =
         let mapRow (row: CsvRow) = { X = parseRow row |> vector; Y = classes.[row.[colunaClasse]] |> vector }
     
         let dados = db.Rows |> Seq.map mapRow |> List.ofSeq
-        let classes = classes.Values |> Seq.map (fun e -> vector e) |> List.ofSeq
+        //let classes = classes.Values |> Seq.map (fun e -> vector e) |> List.ofSeq
+        let classes = classes |> Map.toList |> List.map (fun (_, v) -> v)
 
         algoritmo dados classes neuronios taxas
 
     let algoritmoIris () =
         printfn "Iris"
         let db = CsvFile.Load("iris.data").Cache()
-        let classes = dict["Iris-setosa", vector [1.0; 0.0; 0.0]; "Iris-versicolor", vector [0.0; 1.0; 0.0]; "Iris-virginica", vector [0.0; 0.0; 1.0]]
+        let classes = Map.ofList [("Iris-setosa", vector [1.0; 0.0; 0.0]); ("Iris-versicolor", vector [0.0; 1.0; 0.0]); ("Iris-virginica", vector [0.0; 0.0; 1.0])]
         let taxas = [0.1 .. 0.1 .. 0.5]
         let neuronios = [4 .. 10]
 
@@ -247,9 +254,38 @@ module Algoritmo =
     let algoritmoColuna () =
         printfn "Coluna Terbreval"
         let db = CsvFile.Load("column_3C.dat", " ").Cache()
-        let classes = dict["DH", vector [1.0; 0.0; 0.0]; "SL", vector [0.0; 1.0; 0.0]; "NO", vector [0.0; 0.0; 1.0]]
+        let classes = Map.ofList [("DH", vector [1.0; 0.0; 0.0]); ("SL", vector [0.0; 1.0; 0.0]); "NO", (vector [0.0; 0.0; 1.0])]
         let taxas = [0.2 .. 0.1 .. 0.5]
         let neuronios = [7 .. 10]
 
         algoritmoCSV db classes 6 6 neuronios taxas
+    
+    let classesMap list = 
+        let num = list |> List.length
+        let gen index n = 
+            let head = List.init (index) (fun _ -> 0.0)
+            let tail = List.init (num - head.Length - 1) (fun _ -> 0.0)
+            let v = head @ [1.0] @ tail |> vector
+            (n.ToString(), v)
+        list |> List.mapi gen |> Map.ofList
+        
+    let algoritmoDermatologia () =
+        printfn "Dermatologia"
+        let db = CsvFile.Load("dermatology.data").Cache()
+        
+        let classes = classesMap [1..6]
+        let taxas = [0.1]
+        let neuronios = [7 .. 10]
+
+        algoritmoCSV db classes 34 34 neuronios taxas
+
+    let algoritmoCancer () =
+        printfn "Câncer de Mama"
+        let db = CsvFile.Load("breast-cancer-wisconsin.data").Cache()
+        
+        let classes = [2; 4] |> classesMap
+        let taxas = [0.1]
+        let neuronios = [7 .. 10]
+
+        algoritmoCSV db classes 10 10 neuronios taxas
 
