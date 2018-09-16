@@ -1,6 +1,8 @@
 ﻿namespace RedeMyLittlePoney
 
 open System
+open System.Diagnostics
+
 open FSharp.Data
 open MathNet.Numerics
 open MathNet.Numerics.Random
@@ -8,7 +10,6 @@ open MathNet.Numerics.LinearAlgebra
 open FSharp.Collections.ParallelSeq
 
 module Algoritmo =
-    open System.Diagnostics
 
     //Tipos
     type Par = { X: float Vector; Y: float Vector }
@@ -112,8 +113,10 @@ module Algoritmo =
         //Inicia o treinamento
         pesos m0 0
 
-    let realizacao dados neuronios taxa =
-        let confusao = DenseMatrix.zero 3 3
+    let realizacao dados classes neuronios taxa =
+        let confusao = 
+            let len = classes |> List.length        
+            DenseMatrix.zero len len
     
         let treinamento = 
             let n = dados |> List.length |> float |> (*) 0.8 |> int
@@ -122,14 +125,18 @@ module Algoritmo =
         let teste = dados |> List.except treinamento
 
         let w = pesos treinamento neuronios taxa
+        
+        let iter par =
+            let y = resultado w par.X
+            let index = classes |> List.tryFindIndex (fun e -> e = y)
 
-        let classes = dict[[1.0; 0.0; 0.0] |> vector, 0; [0.0; 1.0; 0.0] |> vector, 1; [0.0; 0.0; 1.0] |> vector, 2]
+            match index with
+                | Some i -> 
+                    let j = classes |> List.findIndex (fun e -> e = par.Y)
+                    confusao.[i, j] <- confusao.[i, j] + 1.0
+                | None -> ()
 
-        teste |>
-            Seq.iter (fun par -> 
-                let a = resultado w par.X
-                if classes.ContainsKey a then (confusao.[classes.[a], classes.[par.Y]] <- confusao.[classes.[a], classes.[par.Y]] + 1.0)
-                )
+        teste |> Seq.iter iter
         
         { TaxaAcerto = confusao.Diagonal().Sum() / float (teste |> Seq.length) ; Confusao = confusao; W = w }
     
@@ -173,11 +180,14 @@ module Algoritmo =
     
     let sw = new Stopwatch();
 
+    let normaliza x min max =
+        (x - min) / (max - min)
+
     let algoritmoIris () =
         printfn "Iris"
         let db = CsvFile.Load("iris.data").Cache()
         let classes = dict["Iris-setosa", [1.0; 0.0; 0.0]; "Iris-versicolor", [0.0; 1.0; 0.0]; "Iris-virginica", [0.0; 0.0; 1.0]]
-
+        
         let parse (s: string) = s.Replace(".", ",") |> System.Double.Parse
 
         let normaliza x =
@@ -186,7 +196,7 @@ module Algoritmo =
             let min = valores |> Seq.min
             let max = valores |> Seq.max
 
-            (x - min) / (max - min)
+            normaliza x min max
     
         let normaliza s = parse s |> normaliza
 
@@ -200,12 +210,14 @@ module Algoritmo =
         sw.Start()
         let parametros = ajusteGrid dados
         sw.Stop()
-        printfn "\nParametros escolhidos: %A (%A)\n" parametros sw.Elapsed
+        printfn "\nParametros escolhidos: \n%A \n(%A)\n" parametros sw.Elapsed
+
         sw.Restart()
         printf "Fazendo realizacoes... "
         
+        let classes = classes.Values |> Seq.map (fun e -> vector e) |> List.ofSeq
         let map _ = 
-            realizacao (dados.SelectPermutation() |> List.ofSeq) parametros.NumeroNeuronios parametros.TaxaAprendizado
+            realizacao (dados.SelectPermutation() |> List.ofSeq) classes parametros.NumeroNeuronios parametros.TaxaAprendizado
 
         let realizacoes =
             [0 .. 20] |> PSeq.map map |> PSeq.toList
