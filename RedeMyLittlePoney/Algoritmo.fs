@@ -8,6 +8,7 @@ open FSharp.Data
 open MathNet.Numerics
 open MathNet.Numerics.Random
 open MathNet.Numerics.LinearAlgebra
+open MathNet.Numerics.Statistics
 open FSharp.Collections.ParallelSeq
 
 module Algoritmo =
@@ -15,10 +16,14 @@ module Algoritmo =
     //Tipos
     type Par = { X: float Vector; Y: float Vector }
     type Modelo = { I: float Vector list; J: float Vector list }
-    type Realizacao = { TaxaAcerto:float; Confusao: float Matrix; W: Modelo }
     type Entrada = { Dados: Par list; Classes: Vector<float> list; NumeroNeuronios: float; TaxaAprendizado: int }
+    
+    type Realizacao = { TaxaAcerto:float; Confusao: float Matrix; W: Modelo }
+    type RealizacaoRegressao = { RMSE :float; W: Modelo }
 
-    type ResultadoAlgoritmo = { Acuracia: float; Melhor: Realizacao; }
+    type ResultadoClassificacao = { Acuracia: float; DesvioPadrao: float; Melhor: Realizacao; }
+    type ResultadoRegressao = { RMSE: float; DesvioPadrao: float; Melhor: RealizacaoRegressao; }
+
     type ResultadoParametros = { NumeroNeuronios: int; TaxaAprendizado: float; Precisao: float }
     
     //Funções
@@ -34,6 +39,9 @@ module Algoritmo =
 
     let linear' _ =
         1.0
+
+    let funcaoRegessao x =
+        3.0 * Math.Sin(x) + 1.0
     
     let ponderada w x =
         x .* w |> Vector.sum
@@ -65,7 +73,7 @@ module Algoritmo =
     let sw = new Stopwatch();
     
     //Próximo modelo para o vetor "treinamento"
-    let pesos dados saidas ativacao ativacao' neuronios taxa  =
+    let pesos dados numSaidas ativacao ativacao' numNeuronios taxaAjuste  =
         (dados: Par list) |> ignore
 
         //Épocas
@@ -85,7 +93,7 @@ module Algoritmo =
                         let f'u = ativacao' (ponderada wj xj)
                         let h = xj
 
-                        let ajuste = e * taxa * f'u * h
+                        let ajuste = e * taxaAjuste * f'u * h
                         wj + ajuste
 
                     let wiMap i wi =
@@ -99,7 +107,7 @@ module Algoritmo =
                             let map j _ = e j * f'u j * wji j
                             m.J |> List.mapi map |> List.sum
 
-                        let ajuste = taxa * h'u * somatorio * par.X
+                        let ajuste = taxaAjuste * h'u * somatorio * par.X
                         wi + ajuste
 
                     let j1 = m.J |> List.mapi wjMap
@@ -119,16 +127,51 @@ module Algoritmo =
             let f _ = Random.doubles n |> vector
             f
         
-        let li = vetorAleatorioFn dados.Head.X.Count |> List.init neuronios 
+        let li = vetorAleatorioFn dados.Head.X.Count |> List.init numNeuronios 
 
-        let lj = vetorAleatorioFn (neuronios + 1) |> List.init saidas 
+        let lj = vetorAleatorioFn (numNeuronios + 1) |> List.init numSaidas 
         
         let m0 = { I = li; J = lj }
 
         //Inicia o treinamento
         pesos m0 0
+    
+    let precisao dados numSaidas ativacao ativacao' numNeuronios taxaAjuste  = 
+        (dados: Par list) |> ignore
+        let secoes = 5
+        let tamanhoSecao = dados.Length / secoes
 
-    let realizacao dados classes ativacao ativacao' neuronios taxa =
+        let precisaoSecao n =
+            let head = dados |> List.take (tamanhoSecao * n)
+            let secao = dados |> List.skip (tamanhoSecao * n) |> List.take tamanhoSecao
+            let tail = dados |> List.skip (tamanhoSecao * (n + 1))
+
+            let treinamento = head @ tail
+            let teste = secao
+
+            let m = pesos treinamento numSaidas ativacao ativacao' numNeuronios taxaAjuste 
+            let acertos = 
+                teste |> 
+                List.map (fun t -> resultado m t.X ativacao = t.Y) |>
+                List.filter (fun r -> r) |>
+                List.length |> float
+            
+            acertos / (float teste.Length)
+
+        [0 .. (secoes - 1)] |> List.map precisaoSecao |> List.average
+
+    let ajusteGrid dados numSaidas ativacao ativacao' neuronios taxas fPrecisao = 
+        let combinacoes = List.allPairs neuronios taxas 
+        
+        let map (neuronios, taxa) =
+            let precisao = fPrecisao dados numSaidas ativacao ativacao' neuronios taxa 
+            let mapping = { NumeroNeuronios = neuronios; TaxaAprendizado = taxa; Precisao = precisao }
+            printfn "%A" mapping
+            mapping
+            
+        combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
+    
+    let realizacao dados classes ativacao ativacao' numNeuronios taxaAjuste =
         let numClasses = classes |> List.length        
         let confusao = DenseMatrix.zero numClasses numClasses
     
@@ -138,7 +181,7 @@ module Algoritmo =
 
         let teste = dados |> List.except treinamento
 
-        let w = pesos treinamento numClasses ativacao ativacao' neuronios taxa 
+        let w = pesos treinamento numClasses ativacao ativacao' numNeuronios taxaAjuste 
         
         let iter par =
             let y = resultado w par.X ativacao
@@ -154,47 +197,12 @@ module Algoritmo =
         
         { TaxaAcerto = confusao.Diagonal().Sum() / float (teste |> Seq.length) ; Confusao = confusao; W = w }
     
-    let precisao dados classes ativacao ativacao' neuronios taxa  = 
-        (dados: Par list) |> ignore
-        let secoes = 5
-        let tamanhoSecao = dados.Length / secoes
-
-        let precisaoSecao n =
-            let head = dados |> List.take (tamanhoSecao * n)
-            let secao = dados |> List.skip (tamanhoSecao * n) |> List.take tamanhoSecao
-            let tail = dados |> List.skip (tamanhoSecao * (n + 1))
-
-            let treinamento = head @ tail
-            let teste = secao
-
-            let m = pesos treinamento classes ativacao ativacao' neuronios taxa 
-            let acertos = 
-                teste |> 
-                List.map (fun t -> resultado m t.X ativacao = t.Y) |>
-                List.filter (fun r -> r) |>
-                List.length |> float
-            
-            acertos / (float teste.Length)
-
-        [0 .. (secoes - 1)] |> List.map precisaoSecao |> List.average
-
-    let ajusteGrid dados classes ativacao ativacao' neuronios taxas = 
-        let combinacoes = List.allPairs neuronios taxas 
-        
-        let map (neuronios, taxa) =
-            let precisao = precisao dados classes ativacao ativacao' neuronios taxa 
-            let mapping = { NumeroNeuronios = neuronios; TaxaAprendizado = taxa; Precisao = precisao }
-            printfn "%A" mapping
-            mapping
-            
-        combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
-    
     let algoritmo dados classes ativacao ativacao' neuronios taxas = 
         let numClasses = classes |> List.length
 
         printfn "Busca de parâmetros em grade\n"
         sw.Start()
-        let parametros = ajusteGrid dados numClasses ativacao ativacao' neuronios taxas
+        let parametros = ajusteGrid dados numClasses ativacao ativacao' neuronios taxas precisao
         sw.Stop()
         printfn "\nParametros escolhidos: \n%A \n(%A)\n" parametros sw.Elapsed
 
@@ -214,11 +222,16 @@ module Algoritmo =
         let media =
             realizacoes |>
             List.averageBy (fun r -> r.TaxaAcerto)
+
+        let desvio = 
+            realizacoes |>
+            List.map (fun r -> r.TaxaAcerto) |>
+            Statistics.StandardDeviation
         
         sw.Stop()
         printfn "%A\n" sw.Elapsed
 
-        { Acuracia = media; Melhor = maior; }
+        { Acuracia = media; DesvioPadrao = desvio; Melhor = maior; }
      
     let algoritmoCSV db classes colunas ativacao ativacao' neuronios taxas =
         (db : Runtime.CsvFile<CsvRow>) |> ignore
@@ -346,3 +359,102 @@ module Algoritmo =
         let taxas = [0.4 .. 0.1 .. 0.5]
 
         algoritmo dadosXor classesXor sigmoide sigmoide' neuronios taxas
+
+    let algoritmoRegressao () =
+        printfn "Regressão"
+        
+        let map n =
+            { X = vector [n]; Y = vector[funcaoRegessao n] }
+
+        let dados = [0.0 .. 500.0] |> List.map map
+        let neuronios = [4..10]
+        let taxas = [0.1..0.5]
+
+        let precisao dados numSaidas ativacao ativacao' numNeuronios taxaAjuste = 
+            (dados: Par list) |> ignore
+            let secoes = 5
+            let tamanhoSecao = dados.Length / secoes
+
+            let precisaoSecao n =
+                let head = dados |> List.take (tamanhoSecao * n)
+                let secao = dados |> List.skip (tamanhoSecao * n) |> List.take tamanhoSecao
+                let tail = dados |> List.skip (tamanhoSecao * (n + 1))
+
+                let treinamento = head @ tail
+                let teste = secao
+
+                let m = pesos treinamento numSaidas ativacao ativacao' numNeuronios taxaAjuste 
+                let map t =
+                    let erro = t.Y.[0] - (resultado m t.X ativacao).[0]
+                    erro * erro
+                
+                let erro = 
+                    teste |> 
+                    List.map map |>
+                    List.average |>
+                    Math.Sqrt
+                
+                erro
+            let erros = [0 .. (secoes - 1)] |> List.map precisaoSecao
+            let min = erros |> List.min
+            let max = erros |> List.max
+            let erros = erros |> List.map (fun e -> 1.0 - (normaliza e min max))
+
+            erros |> List.average
+
+        let realizacao dados numNeuronios taxaAjuste =
+    
+            let treinamento = 
+                let n = dados |> List.length |> float |> (*) 0.8 |> int
+                dados |> List.take n
+
+            let teste = dados |> List.except treinamento
+
+            let w = pesos treinamento 1 linear linear' numNeuronios taxaAjuste 
+        
+            let map par =
+                let y = resultado w par.X linear
+                let erro = par.Y.[0] - y.[0]
+                erro * erro
+
+            let erros = teste |> List.map map
+
+            let rmse = erros |> List.average |> Math.Sqrt
+        
+            { RMSE = rmse ; W = w }
+    
+        let algoritmo = 
+            printfn "Busca de parâmetros em grade\n"
+            sw.Start()
+            let parametros = ajusteGrid dados 1 linear linear' neuronios taxas precisao
+            sw.Stop()
+            printfn "\nParametros escolhidos: \n%A \n(%A)\n" parametros sw.Elapsed
+
+            sw.Restart()
+            printf "Fazendo realizacoes... "
+        
+            let map _ = 
+                realizacao (dados.SelectPermutation() |> List.ofSeq) parametros.NumeroNeuronios parametros.TaxaAprendizado
+
+            let realizacoes =
+                [0 .. 20] |> PSeq.map map |> PSeq.toList
+    
+            let maior = 
+                realizacoes |>
+                List.maxBy (fun r -> r.RMSE)
+        
+            let media =
+                realizacoes |>
+                List.averageBy (fun r -> r.RMSE)
+
+            let desvioPadrao = 
+                realizacoes |> 
+                List.map (fun r -> r.RMSE) |> 
+                Statistics.StandardDeviation
+        
+            sw.Stop()
+            printfn "%A\n" sw.Elapsed
+
+            { RMSE = media; DesvioPadrao = desvioPadrao; Melhor = maior; }
+     
+        algoritmo
