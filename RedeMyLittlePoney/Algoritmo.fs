@@ -369,16 +369,13 @@ module Algoritmo =
         printfn "Regressão"
         
         let map n =
-            //let n = normaliza n 0.0 5.0
-            { X = vector [n]; Y = vector[funcaoRegessao n] }
+            let x = normaliza n 0.0 10.0
+            let y = normaliza (funcaoRegessao n) 0.0 10.0
+            { X = vector [x]; Y = vector[y] }
 
-        let dados = [0.00 .. 0.02 .. 10.0] |> List.map map
-        let neuronios = [8..10]
+        let dados = [0.00 .. 0.01 .. 10.0] |> List.map map
+        let neuronios = [20]
         let taxas = [0.1]
-
-        let dados = [0.0 .. 500.0] |> List.map map
-        let neuronios = [4..10]
-        let taxas = [0.1..0.5]
 
         let precisao dados numSaidas ativacao ativacao' numNeuronios taxaAjuste = 
             (dados: Par list) |> ignore
@@ -395,7 +392,7 @@ module Algoritmo =
 
                 let m = pesos treinamento numSaidas ativacao ativacao' numNeuronios taxaAjuste 
                 let map t =
-                    let erro = t.Y.[0] - (resultado m t.X ativacao).[0]
+                    let erro = t.Y.[0] - (resultadoLinear m t.X).[0]
                     erro * erro
                 
                 let erro = 
@@ -404,11 +401,9 @@ module Algoritmo =
                     List.average |>
                     Math.Sqrt
                 
-                erro
+                -erro
+
             let erros = [0 .. (secoes - 1)] |> List.map precisaoSecao
-            let min = erros |> List.min
-            let max = erros |> List.max
-            let erros = erros |> List.map (fun e -> 1.0 - (normaliza e min max))
 
             erros |> List.average
 
