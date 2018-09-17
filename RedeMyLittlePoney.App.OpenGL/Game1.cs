@@ -18,6 +18,9 @@ namespace RedeMyLittlePoney.App.OpenGL
 
         internal List<PointColor> CoresFundo { get; private set; }
         internal IEnumerable<PointColor> PontosXOR { get; private set; }
+        internal IEnumerable<PointColor> PontosRegressao { get; private set; }
+        internal IEnumerable<PointColor> PontosFuncao { get; private set; }
+
         private Texture2D white, gray;
 
         public Game1()
@@ -48,7 +51,40 @@ namespace RedeMyLittlePoney.App.OpenGL
         {
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
+            LoadClassificacao();
+            LoadRegressao();
 
+            white = new Texture2D(GraphicsDevice, 1, 1);
+            white.SetData(new[] { Color.White });
+
+            gray = new Texture2D(GraphicsDevice, 1, 1);
+            gray.SetData(new[] { new Color(Color.DarkGray, 0.7f) });
+            // TODO: use this.Content to load your game content here
+        }
+
+        private void LoadRegressao()
+        {
+            var w = Application.ResultadoRegressao.Melhor.W;
+
+            PontosRegressao = Enumerable
+                .Range(0, 100)
+                .Select(n => new PointColor
+                {
+                    Point = new Point(n, (int)(Algoritmo.resultadoLinear(w, MVector.Build.Dense(new[] { n / 100.0d }))[0] * 5)),
+                    Color = Color.Red
+                });
+
+            PontosFuncao = Enumerable
+                .Range(0, 100)
+                .Select(n => new PointColor
+                {
+                    Point = new Point(n, (int)(Algoritmo.funcaoRegessao(n / 10.0d) * 10.0d)),
+                    Color = Color.Blue
+                });
+        }
+
+        private void LoadClassificacao()
+        {
             var modelo = Application.ResultadoXOR.Melhor.W;
             var classes = new List<MVector>(Algoritmo.classesXorSeq);
             var dados = new List<Algoritmo.Par>(Algoritmo.dadosXorSeq);
@@ -83,13 +119,6 @@ namespace RedeMyLittlePoney.App.OpenGL
                     Point = new Point((int)(par.X[0] * 100), (int)(par.X[1] * 100)),
                     Color = cores[par.Y]
                 });
-
-            white = new Texture2D(GraphicsDevice, 1, 1);
-            white.SetData(new [] { Color.White });
-
-            gray = new Texture2D(GraphicsDevice, 1, 1);
-            gray.SetData(new[] { new Color(Color.DarkGray, 0.7f) });
-            // TODO: use this.Content to load your game content here
         }
 
         /// <summary>
@@ -124,8 +153,10 @@ namespace RedeMyLittlePoney.App.OpenGL
         {
             GraphicsDevice.Clear(Color.White);
             // TODO: Add your drawing code here
-            
-            var m = Matrix.CreateTranslation(new Vector3(100.0f, 100.0f, 0.0f)) * Matrix.CreateScale(2.0f);
+            Matrix m;
+
+            m = Matrix.CreateScale(2.0f) * Matrix.CreateTranslation(new Vector3(GraphicsDevice.Viewport.Bounds.Width / 2 - 100, 50.0f, 0.0f));
+
             spriteBatch.Begin(transformMatrix: m);
             foreach (var cor in CoresFundo)
             {
@@ -133,6 +164,23 @@ namespace RedeMyLittlePoney.App.OpenGL
             }
 
             foreach (var cor in PontosXOR)
+            {
+                var rect = new Rectangle(cor.Point.X - 2, cor.Point.Y - 2, 4, 4);
+                spriteBatch.Draw(white, cor.Point.ToVector2(), cor.Color);
+            }
+            spriteBatch.End();
+
+            m = Matrix.CreateScale(2.0f) * Matrix.CreateTranslation(new Vector3(GraphicsDevice.Viewport.Bounds.Width / 2 - 100, 300.0f, 0.0f));
+
+            spriteBatch.Begin(transformMatrix: m);
+
+            foreach (var cor in PontosFuncao)
+            {
+                var rect = new Rectangle(cor.Point.X - 2, cor.Point.Y - 2, 4, 4);
+                spriteBatch.Draw(white, cor.Point.ToVector2(), cor.Color);
+            }
+
+            foreach (var cor in PontosRegressao)
             {
                 var rect = new Rectangle(cor.Point.X - 2, cor.Point.Y - 2, 4, 4);
                 spriteBatch.Draw(white, cor.Point.ToVector2(), cor.Color);
