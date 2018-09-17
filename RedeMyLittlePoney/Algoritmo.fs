@@ -66,6 +66,11 @@ module Algoritmo =
     
     let resultadoSigmoide m x =
         resultado m x sigmoide
+
+    let resultadoLinear m x =
+        let xj = saidaCamadaI m.I x
+        let y = saidaCamadaJ m.J xj linear
+        y
     
     let normaliza x min max =
         (x - min) / (max - min)
@@ -364,7 +369,12 @@ module Algoritmo =
         printfn "Regressão"
         
         let map n =
+            //let n = normaliza n 0.0 5.0
             { X = vector [n]; Y = vector[funcaoRegessao n] }
+
+        let dados = [0.00 .. 0.02 .. 10.0] |> List.map map
+        let neuronios = [8..10]
+        let taxas = [0.1]
 
         let dados = [0.0 .. 500.0] |> List.map map
         let neuronios = [4..10]
@@ -413,7 +423,7 @@ module Algoritmo =
             let w = pesos treinamento 1 linear linear' numNeuronios taxaAjuste 
         
             let map par =
-                let y = resultado w par.X linear
+                let y = resultadoLinear w par.X
                 let erro = par.Y.[0] - y.[0]
                 erro * erro
 
@@ -437,7 +447,7 @@ module Algoritmo =
                 realizacao (dados.SelectPermutation() |> List.ofSeq) parametros.NumeroNeuronios parametros.TaxaAprendizado
 
             let realizacoes =
-                [0 .. 20] |> PSeq.map map |> PSeq.toList
+                [0 .. 5] |> PSeq.map map |> PSeq.toList
     
             let maior = 
                 realizacoes |>
@@ -456,5 +466,5 @@ module Algoritmo =
             printfn "%A\n" sw.Elapsed
 
             { RMSE = media; DesvioPadrao = desvioPadrao; Melhor = maior; }
-     
+        
         algoritmo
