@@ -73,7 +73,7 @@ namespace RedeMyLittlePoney.App.OpenGL
                 .Select(p => new PointColor
                 {
                     Point = p,
-                    Color = cores.TryGetValue(Algoritmo.resultado(modelo, MVector.Build.Dense(new[] { p.X / 100.0d, p.Y / 100.0d })), out var v) ? v : Color.White
+                    Color = cores.TryGetValue(Algoritmo.resultadoSigmoide(modelo, MVector.Build.Dense(new[] { p.X / 100.0d, p.Y / 100.0d })), out var v) ? v : Color.White
                 })
                 .ToList();
 
@@ -88,7 +88,7 @@ namespace RedeMyLittlePoney.App.OpenGL
             white.SetData(new [] { Color.White });
 
             gray = new Texture2D(GraphicsDevice, 1, 1);
-            gray.SetData(new[] { Color.DarkGray });
+            gray.SetData(new[] { new Color(Color.DarkGray, 0.7f) });
             // TODO: use this.Content to load your game content here
         }
 
@@ -122,7 +122,7 @@ namespace RedeMyLittlePoney.App.OpenGL
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Draw(GameTime gameTime)
         {
-            GraphicsDevice.Clear(Color.CornflowerBlue);
+            GraphicsDevice.Clear(Color.White);
             // TODO: Add your drawing code here
             
             var m = Matrix.CreateTranslation(new Vector3(100.0f, 100.0f, 0.0f)) * Matrix.CreateScale(2.0f);

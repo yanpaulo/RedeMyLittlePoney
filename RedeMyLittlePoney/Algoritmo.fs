@@ -29,25 +29,35 @@ module Algoritmo =
         //Differentiate.derivative 1 x sigmoide
         (sigmoide x) * (1.0 - (sigmoide x))
     
+    let linear x =
+        x
+
+    let linear' _ =
+        1.0
+    
     let ponderada w x =
         x .* w |> Vector.sum
 
-    let saida w x =
-        ponderada w x |> sigmoide
+    let saida w x ativacao =
+        (ativacao: float -> float) |> ignore
+        ponderada w x |> ativacao
 
     let saidaCamadaI c x =
-        let map w = saida w x
+        let map w = saida w x sigmoide
         let saida = c |> List.map map
         -1.0 :: saida |> vector
         
-    let saidaCamadaJ c x =
-        let map w = saida w x
+    let saidaCamadaJ c x ativacao =
+        let map w = saida w x ativacao
         c |> Seq.map map |> vector
     
-    let resultado m x =
+    let resultado m x ativacao =
         let xj = saidaCamadaI m.I x
-        let y = saidaCamadaJ m.J xj
+        let y = saidaCamadaJ m.J xj ativacao
         y |> Seq.map (fun n -> Math.Round n) |> vector
+    
+    let resultadoSigmoide m x =
+        resultado m x sigmoide
     
     let normaliza x min max =
         (x - min) / (max - min)
@@ -55,7 +65,7 @@ module Algoritmo =
     let sw = new Stopwatch();
     
     //Próximo modelo para o vetor "treinamento"
-    let pesos dados classes neuronios taxa  =
+    let pesos dados saidas ativacao ativacao' neuronios taxa  =
         (dados: Par list) |> ignore
 
         //Épocas
@@ -67,23 +77,23 @@ module Algoritmo =
                 | [] -> m
                 | par :: tail -> 
                     let xj = saidaCamadaI m.I par.X
-                    let y = saidaCamadaJ m.J xj
+                    let y = saidaCamadaJ m.J xj ativacao
                     let erro = par.Y - y
 
                     let wjMap j wj = 
                         let e = erro.[j]
-                        let f'u = sigmoide' (ponderada wj xj)
+                        let f'u = ativacao' (ponderada wj xj)
                         let h = xj
 
                         let ajuste = e * taxa * f'u * h
                         wj + ajuste
 
                     let wiMap i wi =
-                        let h'u = ponderada wi par.X |> sigmoide'
+                        let h'u = ponderada wi par.X |> ativacao'
                         let somatorio =
                             let wj j = m.J.[j]
                             let e j = erro.[j]
-                            let f'u j = ponderada (wj j) xj |> sigmoide'
+                            let f'u j = ponderada (wj j) xj |> ativacao'
                             let wji j = (wj j).[i]
 
                             let map j _ = e j * f'u j * wji j
@@ -111,14 +121,14 @@ module Algoritmo =
         
         let li = vetorAleatorioFn dados.Head.X.Count |> List.init neuronios 
 
-        let lj = vetorAleatorioFn (neuronios + 1) |> List.init classes 
+        let lj = vetorAleatorioFn (neuronios + 1) |> List.init saidas 
         
         let m0 = { I = li; J = lj }
 
         //Inicia o treinamento
         pesos m0 0
 
-    let realizacao dados classes neuronios taxa =
+    let realizacao dados classes ativacao ativacao' neuronios taxa =
         let numClasses = classes |> List.length        
         let confusao = DenseMatrix.zero numClasses numClasses
     
@@ -128,10 +138,10 @@ module Algoritmo =
 
         let teste = dados |> List.except treinamento
 
-        let w = pesos treinamento numClasses neuronios taxa 
+        let w = pesos treinamento numClasses ativacao ativacao' neuronios taxa 
         
         let iter par =
-            let y = resultado w par.X
+            let y = resultado w par.X ativacao
             let index = classes |> List.tryFindIndex (fun e -> e = y)
 
             match index with
@@ -144,7 +154,7 @@ module Algoritmo =
         
         { TaxaAcerto = confusao.Diagonal().Sum() / float (teste |> Seq.length) ; Confusao = confusao; W = w }
     
-    let precisao dados classes neuronios taxa  = 
+    let precisao dados classes ativacao ativacao' neuronios taxa  = 
         (dados: Par list) |> ignore
         let secoes = 5
         let tamanhoSecao = dados.Length / secoes
@@ -157,10 +167,10 @@ module Algoritmo =
             let treinamento = head @ tail
             let teste = secao
 
-            let m = pesos treinamento classes neuronios taxa 
+            let m = pesos treinamento classes ativacao ativacao' neuronios taxa 
             let acertos = 
                 teste |> 
-                List.map (fun t -> resultado m t.X = t.Y) |>
+                List.map (fun t -> resultado m t.X ativacao = t.Y) |>
                 List.filter (fun r -> r) |>
                 List.length |> float
             
@@ -168,23 +178,23 @@ module Algoritmo =
 
         [0 .. (secoes - 1)] |> List.map precisaoSecao |> List.average
 
-    let ajusteGrid dados classes neuronios taxas = 
+    let ajusteGrid dados classes ativacao ativacao' neuronios taxas = 
         let combinacoes = List.allPairs neuronios taxas 
         
         let map (neuronios, taxa) =
-            let precisao = precisao dados classes neuronios taxa 
+            let precisao = precisao dados classes ativacao ativacao' neuronios taxa 
             let mapping = { NumeroNeuronios = neuronios; TaxaAprendizado = taxa; Precisao = precisao }
             printfn "%A" mapping
             mapping
             
         combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
     
-    let algoritmo dados classes neuronios taxas = 
+    let algoritmo dados classes ativacao ativacao' neuronios taxas = 
         let numClasses = classes |> List.length
 
         printfn "Busca de parâmetros em grade\n"
         sw.Start()
-        let parametros = ajusteGrid dados numClasses neuronios taxas
+        let parametros = ajusteGrid dados numClasses ativacao ativacao' neuronios taxas
         sw.Stop()
         printfn "\nParametros escolhidos: \n%A \n(%A)\n" parametros sw.Elapsed
 
@@ -192,7 +202,7 @@ module Algoritmo =
         printf "Fazendo realizacoes... "
         
         let map _ = 
-            realizacao (dados.SelectPermutation() |> List.ofSeq) classes parametros.NumeroNeuronios parametros.TaxaAprendizado
+            realizacao (dados.SelectPermutation() |> List.ofSeq) classes ativacao ativacao' parametros.NumeroNeuronios parametros.TaxaAprendizado
 
         let realizacoes =
             [0 .. 20] |> PSeq.map map |> PSeq.toList
@@ -210,7 +220,7 @@ module Algoritmo =
 
         { Acuracia = media; Melhor = maior; }
      
-    let algoritmoCSV db classes colunas neuronios taxas =
+    let algoritmoCSV db classes colunas ativacao ativacao' neuronios taxas =
         (db : Runtime.CsvFile<CsvRow>) |> ignore
         (classes: Map<string, float Vector>) |> ignore
 
@@ -243,7 +253,7 @@ module Algoritmo =
         let classes = classes |> Map.toList |> List.map (fun (_, v) -> v)
 
 
-        algoritmo dados classes neuronios taxas
+        algoritmo dados classes ativacao ativacao' neuronios taxas
 
     let algoritmoIris () =
         printfn "Iris"
@@ -252,7 +262,7 @@ module Algoritmo =
         let taxas = [0.1 .. 0.1 .. 0.5]
         let neuronios = [4 .. 10]
 
-        algoritmoCSV db classes 4 neuronios taxas
+        algoritmoCSV db classes 4 sigmoide sigmoide' neuronios taxas
 
     let algoritmoColuna () =
         printfn "Coluna Terbreval"
@@ -261,7 +271,7 @@ module Algoritmo =
         let taxas = [0.2 .. 0.1 .. 0.5]
         let neuronios = [7 .. 10]
 
-        algoritmoCSV db classes 6 neuronios taxas
+        algoritmoCSV db classes 6 sigmoide sigmoide' neuronios taxas
     
     let classesMap list = 
         let num = list |> List.length
@@ -280,7 +290,7 @@ module Algoritmo =
         let taxas = [0.1]
         let neuronios = [7 .. 10]
 
-        algoritmoCSV db classes 34 neuronios taxas
+        algoritmoCSV db classes 34 sigmoide sigmoide' neuronios taxas
 
     let algoritmoCancer () =
         printfn "Câncer de Mama"
@@ -290,7 +300,7 @@ module Algoritmo =
         let taxas = [0.1]
         let neuronios = [7 .. 10]
 
-        algoritmoCSV db classes 10 neuronios taxas
+        algoritmoCSV db classes 10 sigmoide sigmoide' neuronios taxas
     
     let classesXor = [ vector [1.0; 0.0]; vector [0.0; 1.0]]
     let classesXorSeq = classesXor |> seq
@@ -335,4 +345,4 @@ module Algoritmo =
         let neuronios = [8 .. 10]
         let taxas = [0.4 .. 0.1 .. 0.5]
 
-        algoritmo dadosXor classesXor neuronios taxas
+        algoritmo dadosXor classesXor sigmoide sigmoide' neuronios taxas
