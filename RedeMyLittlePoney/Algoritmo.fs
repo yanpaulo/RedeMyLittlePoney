@@ -165,9 +165,11 @@ module Algoritmo =
 
         [0 .. (secoes - 1)] |> List.map precisaoSecao |> List.average
 
-    let ajusteGrid dados numSaidas ativacao ativacao' neuronios taxas fPrecisao = 
+    let ajusteGridP dados numSaidas ativacao ativacao' neuronios taxas fPrecisao = 
         let combinacoes = List.allPairs neuronios taxas 
         
+        printfn "Busca de parâmetros em grade\n"
+        printfn "Neurônios X Taxas: %A x %A" neuronios taxas
         let map (neuronios, taxa) =
             let precisao = fPrecisao dados numSaidas ativacao ativacao' neuronios taxa 
             let mapping = { NumeroNeuronios = neuronios; TaxaAprendizado = taxa; Precisao = precisao }
@@ -175,6 +177,9 @@ module Algoritmo =
             mapping
             
         combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
+    
+    let ajusteGrid dados numSaidas ativacao ativacao' neuronios taxas =
+        ajusteGridP dados numSaidas ativacao ativacao' neuronios taxas precisao
     
     let realizacao dados classes ativacao ativacao' numNeuronios taxaAjuste =
         let numClasses = classes |> List.length        
@@ -205,9 +210,8 @@ module Algoritmo =
     let algoritmo dados classes ativacao ativacao' neuronios taxas = 
         let numClasses = classes |> List.length
 
-        printfn "Busca de parâmetros em grade\n"
         sw.Start()
-        let parametros = ajusteGrid dados numClasses ativacao ativacao' neuronios taxas precisao
+        let parametros = ajusteGrid dados numClasses ativacao ativacao' neuronios taxas
         sw.Stop()
         printfn "\nParametros escolhidos: \n%A \n(%A)\n" parametros sw.Elapsed
 
@@ -277,8 +281,9 @@ module Algoritmo =
         printfn "Iris"
         let db = CsvFile.Load("iris.data").Cache()
         let classes = Map.ofList [("Iris-setosa", vector [1.0; 0.0; 0.0]); ("Iris-versicolor", vector [0.0; 1.0; 0.0]); ("Iris-virginica", vector [0.0; 0.0; 1.0])]
-        let taxas = [0.1 .. 0.1 .. 0.5]
+
         let neuronios = [4 .. 10]
+        let taxas = [0.1 .. 0.1 .. 0.5]
 
         algoritmoCSV db classes 4 sigmoide sigmoide' neuronios taxas
 
@@ -286,8 +291,8 @@ module Algoritmo =
         printfn "Coluna Terbreval"
         let db = CsvFile.Load("column_3C.dat", " ").Cache()
         let classes = Map.ofList [("DH", vector [1.0; 0.0; 0.0]); ("SL", vector [0.0; 1.0; 0.0]); "NO", (vector [0.0; 0.0; 1.0])]
-        let taxas = [0.2 .. 0.1 .. 0.5]
-        let neuronios = [7 .. 10]
+        let taxas = [0.1 .. 0.1 .. 0.5]
+        let neuronios = [4 .. 10]
 
         algoritmoCSV db classes 6 sigmoide sigmoide' neuronios taxas
     
@@ -431,7 +436,7 @@ module Algoritmo =
         let algoritmo = 
             printfn "Busca de parâmetros em grade\n"
             sw.Start()
-            let parametros = ajusteGrid dados 1 linear linear' neuronios taxas precisao
+            let parametros = ajusteGridP dados 1 linear linear' neuronios taxas precisao
             sw.Stop()
             printfn "\nParametros escolhidos: \n%A \n(%A)\n" parametros sw.Elapsed
 
