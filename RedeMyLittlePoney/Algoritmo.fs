@@ -370,10 +370,10 @@ module Algoritmo =
         
         let map n =
             let x = normaliza n 0.0 10.0
-            let y = normaliza (funcaoRegessao n) 0.0 10.0
+            let y = funcaoRegessao n
             { X = vector [x]; Y = vector[y] }
 
-        let dados = [0.00 .. 0.01 .. 10.0] |> List.map map
+        let dados = [0.0 .. 0.02 .. 10.0] |> List.map map
         let neuronios = [20]
         let taxas = [0.1]
 
@@ -442,7 +442,7 @@ module Algoritmo =
                 realizacao (dados.SelectPermutation() |> List.ofSeq) parametros.NumeroNeuronios parametros.TaxaAprendizado
 
             let realizacoes =
-                [0 .. 5] |> PSeq.map map |> PSeq.toList
+                [0 .. 20] |> PSeq.map map |> PSeq.toList
     
             let maior = 
                 realizacoes |>
@@ -461,5 +461,8 @@ module Algoritmo =
             printfn "%A\n" sw.Elapsed
 
             { RMSE = media; DesvioPadrao = desvioPadrao; Melhor = maior; }
+
+        let range = [0.0 .. 0.001 .. 0.02] |> List.map(fun n -> vector [n] |> resultadoLinear algoritmo.Melhor.W |> vector)
+        printfn "%A" range
         
         algoritmo

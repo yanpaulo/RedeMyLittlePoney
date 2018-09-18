@@ -70,7 +70,7 @@ namespace RedeMyLittlePoney.App.OpenGL
                 .Range(0, 100)
                 .Select(n => new PointColor
                 {
-                    Point = new Point(n, (int)(Algoritmo.resultadoLinear(w, MVector.Build.Dense(new[] { n / 100.0d }))[0] * 100)),
+                    Point = new Point(n, (int)(Algoritmo.resultadoLinear(w, MVector.Build.Dense(new[] { n / 100.0 }))[0] * 10)),
                     Color = Color.Red
                 });
 
@@ -78,7 +78,7 @@ namespace RedeMyLittlePoney.App.OpenGL
                 .Range(0, 100)
                 .Select(n => new PointColor
                 {
-                    Point = new Point(n, (int)(Algoritmo.funcaoRegessao(n / 10.0d) * 10.0d)),
+                    Point = new Point(n, (int)(Algoritmo.funcaoRegessao(n / 10.0) * 10)),
                     Color = Color.Blue
                 });
         }
