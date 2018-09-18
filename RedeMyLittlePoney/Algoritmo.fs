@@ -374,7 +374,7 @@ module Algoritmo =
             { X = vector [x]; Y = vector[y] }
 
         let dados = [0.0 .. 0.02 .. 10.0] |> List.map map
-        let neuronios = [20]
+        let neuronios = [4..20]
         let taxas = [0.1]
 
         let precisao dados numSaidas ativacao ativacao' numNeuronios taxaAjuste = 
