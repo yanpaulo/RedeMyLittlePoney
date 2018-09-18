@@ -13,8 +13,10 @@ namespace RedeMyLittlePoney.App.OpenGL
         [STAThread]
         static void Main()
         {
+#if !DISABLE_XOR
             Application.ResultadoXOR = Algoritmo.algoritmoXor();
-            Console.WriteLine(Application.ResultadoXOR);
+            Console.WriteLine(Application.ResultadoXOR); 
+#endif
             Application.ResultadoRegressao = Algoritmo.algoritmoRegressao();
             Console.WriteLine(Application.ResultadoRegressao);
 

@@ -51,7 +51,9 @@ namespace RedeMyLittlePoney.App.OpenGL
         {
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
-            LoadClassificacao();
+#if !DISABLE_XOR
+            LoadClassificacao(); 
+#endif
             LoadRegressao();
 
             white = new Texture2D(GraphicsDevice, 1, 1);
@@ -155,6 +157,7 @@ namespace RedeMyLittlePoney.App.OpenGL
             // TODO: Add your drawing code here
             Matrix m;
 
+#if !DISABLE_XOR
             m = Matrix.CreateScale(2.0f) * Matrix.CreateTranslation(new Vector3(GraphicsDevice.Viewport.Bounds.Width / 2 - 100, 50.0f, 0.0f));
 
             spriteBatch.Begin(transformMatrix: m);
@@ -168,7 +171,8 @@ namespace RedeMyLittlePoney.App.OpenGL
                 var rect = new Rectangle(cor.Point.X - 2, cor.Point.Y - 2, 4, 4);
                 spriteBatch.Draw(white, cor.Point.ToVector2(), cor.Color);
             }
-            spriteBatch.End();
+            spriteBatch.End(); 
+#endif
 
             m = Matrix.CreateScale(2.0f) * Matrix.CreateTranslation(new Vector3(GraphicsDevice.Viewport.Bounds.Width / 2 - 100, 300.0f, 0.0f));
 
