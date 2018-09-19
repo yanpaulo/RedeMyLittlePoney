@@ -14,16 +14,22 @@ open FSharp.Collections.ParallelSeq
 module Algoritmo =
 
     //Tipos
-    type Par = { X: float Vector; Y: float Vector }
-    type Modelo = { I: float Vector list; J: float Vector list }
-    type Entrada = { Dados: Par list; Classes: Vector<float> list; NumeroNeuronios: float; TaxaAprendizado: int }
     
+    //Par de Entrada X e saída desejada Y
+    type Par = { X: float Vector; Y: float Vector }
+    //Modelo contendo as listas de neurônios I (camada oculta) e J (camada de saída)
+    type Modelo = { I: float Vector list; J: float Vector list }
+    //Parâmetros de entrada para a realização do algoritmo
+    type Entrada = { Dados: Par list; Classes: Vector<float> list; NumeroNeuronios: float; TaxaAprendizado: int }
+    //Saída de uma realização
     type Realizacao = { TaxaAcerto:float; Confusao: float Matrix; W: Modelo }
+    //Saída uma realização para Regressão
     type RealizacaoRegressao = { RMSE :float; W: Modelo }
-
+    //Resultado do algoritmo para CLassificação
     type ResultadoClassificacao = { Acuracia: float; DesvioPadrao: float; Melhor: Realizacao; }
+    //Resultado do algoritmo para Regressão
     type ResultadoRegressao = { RMSE: float; DesvioPadrao: float; Melhor: RealizacaoRegressao; }
-
+    //Resultado da Busca em Grade
     type ResultadoParametros = { NumeroNeuronios: int; TaxaAprendizado: float; Precisao: float }
     
     //Funções
@@ -40,16 +46,19 @@ module Algoritmo =
     let linear' _ =
         1.0
 
+    //Função para regressão conforme destritivo do trabalho
     let funcaoRegessao x =
         3.0 * Math.Sin(x) + 1.0
     
+    //Soma ponderada para entrada x e vetor de pesos w
     let ponderada w x =
         x .* w |> Vector.sum
 
+    //Saída do neurônio conforme função de ativação.
     let saida w x ativacao =
         (ativacao: float -> float) |> ignore
         ponderada w x |> ativacao
-
+    
     let saidaCamadaI c x =
         let map w = saida w x sigmoide
         let saida = c |> List.map map
@@ -59,25 +68,31 @@ module Algoritmo =
         let map w = saida w x ativacao
         c |> Seq.map map |> vector
     
+    //Resultado para entrada x na rede MLP, com arredondamento da saída
     let resultado m x ativacao =
         let xj = saidaCamadaI m.I x
         let y = saidaCamadaJ m.J xj ativacao
         y |> Seq.map (fun n -> Math.Round n) |> vector
     
+    //Resultado para função de ativação sigmóide
     let resultadoSigmoide m x =
         resultado m x sigmoide
 
+    //Resultado para função de ativação linear
     let resultadoLinear m x =
         let xj = saidaCamadaI m.I x
         let y = saidaCamadaJ m.J xj linear
         y
     
+    //Normalização
     let normaliza x min max =
         (x - min) / (max - min)
-
+    
+    //Contador de tempo para medição de performance.
     let sw = new Stopwatch();
     
-    //Próximo modelo para o vetor "treinamento"
+    //Próximo modelo para o vetor "dados"
+    //Implementação back-propagation com tail-recursion
     let pesos dados numSaidas ativacao ativacao' numNeuronios taxaAjuste  =
         (dados: Par list) |> ignore
 
@@ -141,6 +156,7 @@ module Algoritmo =
         //Inicia o treinamento
         pesos m0 0
     
+    //Precisão via validação cruzada para quantidade de neurônios X taxa de ajute
     let precisao dados numSaidas ativacao ativacao' numNeuronios taxaAjuste  = 
         (dados: Par list) |> ignore
         let secoes = 5
@@ -164,7 +180,8 @@ module Algoritmo =
             acertos / (float teste.Length)
 
         [0 .. (secoes - 1)] |> List.map precisaoSecao |> List.average
-
+    
+    //Busca em grade de quantidade de neurônios X taxa de ajuste
     let ajusteGridP dados numSaidas ativacao ativacao' neuronios taxas fPrecisao = 
         let combinacoes = List.allPairs neuronios taxas 
         
@@ -178,8 +195,10 @@ module Algoritmo =
             
         combinacoes |> PSeq.map map |> PSeq.maxBy (fun r -> r.Precisao)
     
+    //Busca em grade com a função "precisão" padrão
     let ajusteGrid dados numSaidas ativacao ativacao' neuronios taxas =
         ajusteGridP dados numSaidas ativacao ativacao' neuronios taxas precisao
+    
     
     let realizacao dados classes ativacao ativacao' numNeuronios taxaAjuste =
         let numClasses = classes |> List.length        
@@ -207,6 +226,7 @@ module Algoritmo =
         
         { TaxaAcerto = confusao.Diagonal().Sum() / float (teste |> Seq.length) ; Confusao = confusao; W = w }
     
+    //Faz 20 realizações e computa a acurácia, desvio padrão e melhor realização.
     let algoritmo dados classes ativacao ativacao' neuronios taxas = 
         let numClasses = classes |> List.length
 
@@ -242,6 +262,7 @@ module Algoritmo =
 
         { Acuracia = media; DesvioPadrao = desvio; Melhor = maior; }
      
+    //Inicia o algoritmo a partir de um banco de dados CSV fornecido
     let algoritmoCSV db classes colunas ativacao ativacao' neuronios taxas =
         (db : Runtime.CsvFile<CsvRow>) |> ignore
         (classes: Map<string, float Vector>) |> ignore
@@ -326,7 +347,6 @@ module Algoritmo =
         algoritmoCSV db classes 10 sigmoide sigmoide' neuronios taxas
     
     let classesXor = [ vector [1.0; 0.0]; vector [0.0; 1.0]]
-    let classesXorSeq = classesXor |> seq
 
     let dadosXor = 
         let range min max n =
@@ -360,6 +380,8 @@ module Algoritmo =
         let dados = classe1 @ classe2
         dados
     
+    let classesXorSeq = classesXor |> seq
+
     let dadosXorSeq = dadosXor |> seq
 
     let algoritmoXor () =
@@ -369,7 +391,8 @@ module Algoritmo =
         let taxas = [0.4 .. 0.1 .. 0.5]
 
         algoritmo dadosXor classesXor sigmoide sigmoide' neuronios taxas
-
+    
+    //Para regressão algumas das funções vistas anteriormente são redefinidas, mas continuam com as mesmas finalidades.
     let algoritmoRegressao () =
         printfn "Regressão"
         
